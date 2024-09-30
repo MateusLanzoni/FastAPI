@@ -1,1 +1,18 @@
+# Ignorar el archivo de instalación de Miniconda
 Miniconda3-latest-Linux-x86_64.sh
+
+# Ignorar la carpeta env
+./env
+
+# Ignorar la carpeta __pycache__
+./__pycache__
+
+# Añadir nuevas carpetas a ignorar
+# Ignorar la carpeta logs
+logs/
+
+# Ignorar la carpeta temp
+temp/
+
+# Ignorar la carpeta build
+build/
