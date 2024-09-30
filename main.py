@@ -1,58 +1,119 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-# from database import SessionLocal
-from models import Movie
-from typing import List, Optional
 from datetime import date
+from typing import List, Optional
+from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Depends
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = FastAPI()
 
-# Dependencia para obtener la base de datos
-# Conexión a la base de datos
+# Database connection
 def connect_to_db():
     conn = psycopg2.connect(
-    host="localhost",
-    database="sisopTaller",
-    user="postgres",
-    password="dollarfen54"
+        host="localhost",
+        database="sisoptaller",
+        user="sistemas",
+        password="dollarfen54"
     )
     return conn
 
-# Dependencia para obtener la conexión a la base de datos
-def get_db():
-    conn = connect_to_db()
-    try:
-        yield conn
-    finally:
-        conn.close()
+# Pydantic model for Movie
+class Movie(BaseModel):
+    id: Optional[int]
+    title: str
+    release_date: date
+    genre: str
 
-@app.get("/movies/", response_model=List[Movie])
-def get_movies(skip: int = 0, limit: int = 100, 
-               title: Optional[str] = None,
-               popularity: Optional[float] = None, 
-               release_date: Optional[str] = None, 
-	           vote_average: Optional[float] = None, 
-               db: Session = Depends(get_db)):
-    
-    if limit > 100:
-        limit = 100  # Limitar a un máximo de 100 resultados por página
-    
-    # Empezamos construyendo la consulta
-    query = db.query(Movie)
-    
-    # Agregar filtros si se pasan como parámetros
-    if title:
-        query = query.filter(Movie.title.ilike(f"%{title}%"))
-    if popularity:
-        query = query.filter(Movie.popularity >= popularity)
-    if release_date:
-        query = query.filter(Movie.release_date == release_date)
-    
-    # Obtener los resultados con paginación
-    movies = query.offset(skip).limit(limit).all()
-    
-    if not movies:
-        raise HTTPException(status_code=404, detail="No movies found")
-    
+# Create movies table
+def create_movies_table():
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS movies (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(100) NOT NULL,
+        release_date DATE NOT NULL,
+        genre VARCHAR(50) NOT NULL
+    )
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+create_movies_table()
+
+# CRUD operations
+def get_movies():
+    conn = connect_to_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM movies")
+    movies = cursor.fetchall()
+    cursor.close()
+    conn.close()
     return movies
+
+def get_movie(movie_id: int):
+    conn = connect_to_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM movies WHERE id = %s", (movie_id,))
+    movie = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie
+
+def create_movie(movie: Movie):
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO movies (title, release_date, genre) VALUES (%s, %s, %s) RETURNING id",
+        (movie.title, movie.release_date, movie.genre)
+    )
+    movie_id = cursor.fetchone()[0]
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {**movie.dict(), "id": movie_id}
+
+def update_movie(movie_id: int, movie: Movie):
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE movies SET title = %s, release_date = %s, genre = %s WHERE id = %s",
+        (movie.title, movie.release_date, movie.genre, movie_id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return get_movie(movie_id)
+
+def delete_movie(movie_id: int):
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"message": "Movie deleted successfully"}
+
+# FastAPI endpoints
+@app.get("/movies", response_model=List[Movie])
+def read_movies():
+    return get_movies()
+
+@app.get("/movies/{movie_id}", response_model=Movie)
+def read_movie(movie_id: int):
+    return get_movie(movie_id)
+
+@app.post("/movies", response_model=Movie)
+def add_movie(movie: Movie):
+    return create_movie(movie)
+
+@app.put("/movies/{movie_id}", response_model=Movie)
+def edit_movie(movie_id: int, movie: Movie):
+    return update_movie(movie_id, movie)
+
+@app.delete("/movies/{movie_id}")
+def remove_movie(movie_id: int):
+    return delete_movie(movie_id)
