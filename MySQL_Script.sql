@@ -8,7 +8,7 @@ CREATE TABLE movies (
 
 DROP TABLE IF EXISTS movies;
 
-COPY movies (popularity, release_date, title, vote_average) FROM 'C:\Users\danie\Desktop\Top_Rated_Movies.csv' DELIMITER ',' CSV HEADER;
+COPY movies (popularity, release_date, title, vote_average) FROM '/home/daniel/FastAPI/Top_Rated_Movies.csv' DELIMITER ',' CSV HEADER;
 
 SELECT * FROM movies;
 
