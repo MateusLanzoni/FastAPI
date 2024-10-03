@@ -34,6 +34,40 @@ def connect_to_db():
 def read_root():
     return {"message": "Welcome to the FastAPI application!"}
 
+@app.get("/movies/fecha/")
+def read_movies_by_date(start_date: str, end_date: str):
+    try:
+        start_date_obj = datetime.strptime(start_date, "%m-%d-%Y")
+        end_date_obj = datetime.strptime(end_date, "%m-%d-%Y")
+    except ValueError:
+        return {"error": "Formato de fecha inválido. Use MM-DD-YYYY."}
+
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT popularity, release_date, title, vote_average
+        FROM movies 
+        WHERE release_date BETWEEN %s AND %s
+        LIMIT 100
+    """, (start_date, end_date))
+    
+    movies = cursor.fetchall()
+    conn.close()
+    
+    result = [
+        {
+            "popularity": movie[0],
+            "release_date": movie[1],
+            "title": movie[2],
+            "vote_average": movie[3],
+        }
+        for movie in movies
+    ]
+    
+    return {"movies": result}
+
+
 
 @app.get("/movie/{movie_name}")
 def read_movie(movie_name: str):
