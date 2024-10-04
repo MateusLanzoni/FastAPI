@@ -1,0 +1,13 @@
+[Unit]
+Description=FastAPI Application
+After=network.target
+
+[Service]
+User=sistemas
+Group=sistemas
+WorkingDirectory=/home/daniel/FastAPI
+ExecStart=/usr/bin/env uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
